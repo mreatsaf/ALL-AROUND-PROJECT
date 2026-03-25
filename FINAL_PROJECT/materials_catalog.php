@@ -2,85 +2,161 @@
 session_start();
 include 'connect.php';
 
+// ✅ ADMIN SECURITY (same as dashboard)
 if (!isset($_SESSION['user_id'])) {
     header("Location: index.php");
     exit();
 }
 
-// Gamitan natin ng COALESCE sa SQL para safe kahit anong column name
-$sql = "SELECT *, IFNULL(CategoryName, 'General') as Cat FROM materials ORDER BY Cat ASC, MaterialName ASC";
-$result = $conn->query($sql);
+// ADD MATERIAL
+if (isset($_POST['add'])) {
+    $name = $_POST['name'];
+    $category = $_POST['category'];
+    $quantity = $_POST['quantity'];
 
-$categories = [];
-
-if ($result && $result->num_rows > 0) {
-    while($row = $result->fetch_assoc()) {
-        // Kunin natin yung category, kung empty, 'General' ang default
-        $catName = !empty($row['Cat']) ? $row['Cat'] : 'General';
-        $categories[$catName][] = $row;
-    }
+    $conn->query("INSERT INTO materials (MaterialName, Category, Quantity) 
+                  VALUES ('$name', '$category', '$quantity')");
 }
+
+// DELETE MATERIAL
+if (isset($_GET['delete'])) {
+    $id = $_GET['delete'];
+    $conn->query("DELETE FROM materials WHERE MaterialID = $id");
+}
+
+// FETCH MATERIALS
+$result = $conn->query("SELECT * FROM materials ORDER BY MaterialID DESC");
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Library Materials Catalog</title>
+    <title>Materials Catalog</title>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; padding: 30px; }
-        .container { max-width: 900px; margin: auto; }
-        .category-section { background: white; border-radius: 10px; padding: 20px; margin-bottom: 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .category-header { border-left: 5px solid #007bff; padding-left: 15px; margin-bottom: 15px; color: #007bff; text-transform: uppercase; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-        .badge-in { color: #28a745; background: #e6ffed; padding: 4px 8px; border-radius: 5px; font-weight: bold; font-size: 0.85em; }
-        .badge-out { color: #dc3545; background: #ffeef0; padding: 4px 8px; border-radius: 5px; font-weight: bold; font-size: 0.85em; }
-        .back-btn { text-decoration: none; color: #666; font-weight: bold; margin-bottom: 20px; display: inline-block; }
+     body {
+    font-family: Arial;
+    background: #f0f2f5;
+    padding: 20px;
+}
+
+.container {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+}
+
+/* FORM */
+form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+input {
+    padding: 8px;
+    width: 200px;
+}
+
+button {
+    padding: 8px 15px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+/* TABLE */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th {
+    background: #f8f9fa;
+    font-weight: bold;
+}
+
+th, td {
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+}
+
+/* LEFT ALIGN TEXT COLUMNS */
+th:nth-child(2), td:nth-child(2),
+th:nth-child(3), td:nth-child(3) {
+    text-align: left;
+}
+
+/* CENTER OTHER COLUMNS */
+th:nth-child(1), td:nth-child(1),
+th:nth-child(4), td:nth-child(4),
+th:nth-child(5), td:nth-child(5),
+th:nth-child(6), td:nth-child(6) {
+    text-align: center;
+}
+
+/* ROW HOVER */
+tr:hover {
+    background: #f1f1f1;
+}
+
+/* DELETE BUTTON */
+.delete {
+    background: #dc3545;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 5px;
+    text-decoration: none;
+}
     </style>
 </head>
 <body>
 
-<div class="container">
-    <a href="userdashboard.php" class="back-btn">← Back to Dashboard</a>
-    <h1>📚 Library Resources</h1>
 
-    <?php if (empty($categories)): ?>
-        <div class="category-section" style="text-align: center; padding: 50px;">
-            <h2 style="color: #888;">No Materials Found</h2>
-            <p>Make sure your <strong>materials</strong> table has rows and a <strong>CategoryName</strong> column.</p>
-        </div>
-    <?php else: ?>
-        <?php foreach ($categories as $catName => $items): ?>
-            <div class="category-section">
-                <h2 class="category-header"><?= htmlspecialchars($catName) ?></h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Item Name</th>
-                            <th>Status</th>
-                            <th>Stock</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($items as $item): ?>
-                        <tr>
-                            <td><strong><?= htmlspecialchars($item['MaterialName']) ?></strong></td>
-                            <td>
-                                <?php if($item['Quantity'] > 0): ?>
-                                    <span class="badge-in">Available</span>
-                                <?php else: ?>
-                                    <span class="badge-out">Out of Stock</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><?= $item['Quantity'] ?> copies</td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endforeach; ?>
-    <?php endif; ?>
+<div class="container">
+    <a href="admindashboard.php" style="text-decoration: none; color: blue;">← Back to Dashboard</a>
+    <h1>🧰 Materials Management</h1>
+    <h3>Add New Material</h3>
+
+    <!-- ADD FORM -->
+    <form method="POST">
+        <input type="text" name="name" placeholder="Material Name" required>
+        <input type="text" name="category" placeholder="Category">
+        <input type="number" name="quantity" placeholder="Quantity" required>
+        <button type="submit" name="add">Add Material</button>
+    </form>
+
+    <!-- TABLE -->
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Quantity</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>
+
+        <?php while($row = $result->fetch_assoc()): ?>
+        <tr>
+            <td><?= $row['MaterialID']; ?></td>
+            <td><?= $row['MaterialName']; ?></td>
+            <td><?= $row['Category']; ?></td>
+            <td><?= $row['Quantity']; ?></td>
+            <td><?= $row['Quantity'] > 0 ? 'Available' : 'Unavailable'; ?></td>
+            <td>
+                <a href="?delete=<?= $row['MaterialID']; ?>" 
+                   class="delete"
+                   onclick="return confirm('Delete this material?')">
+                   Delete
+                </a>
+            </td>
+        </tr>
+        <?php endwhile; ?>
+    </table>
 </div>
 
 </body>
