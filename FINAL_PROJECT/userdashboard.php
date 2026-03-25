@@ -14,8 +14,12 @@ $uName = $_SESSION['user_name'];
 // 2. FETCH Notifications
 $notifQuery = $conn->query("SELECT * FROM notifications WHERE UserID = '$uID' ORDER BY CreatedAt DESC LIMIT 5");
 
-// 3. FETCH Books (Quick View) - Para makita uli yung mga libro
-$booksQuery = $conn->query("SELECT BookTitle, Quantity FROM books LIMIT 5");
+// 3. FETCH Borrowed Books (Active & History)
+$borrowQuery = $conn->query("SELECT b.BorrowID, bk.BookTitle, b.BorrowDate, b.DueDate, b.Status 
+                             FROM borrow b 
+                             JOIN books bk ON b.BookID = bk.BookID 
+                             WHERE b.UserID = '$uID' 
+                             ORDER BY b.BorrowDate DESC");
 
 // 4. FETCH Total Unpaid Fines
 $fineQuery = $conn->query("SELECT SUM(Amount) as total FROM fine JOIN borrow ON fine.BorrowID = borrow.BorrowID WHERE borrow.UserID = '$uID' AND PaidStatus = 'Unpaid'");
@@ -50,7 +54,9 @@ if ($role) {
         .role-badge { background: #e7f3ff; color: #007bff; padding: 3px 12px; border-radius: 20px; font-size: 0.85em; font-weight: bold; border: 1px solid #007bff; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-        .catalog-link:hover { background: #0056b3 !important; transform: translateY(-2px); transition: 0.2s; }
+        .badge { padding: 4px 8px; border-radius: 5px; font-size: 0.8em; font-weight: bold; }
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-returned { background: #d4edda; color: #155724; }
         .logout-btn { color: #dc3545; text-decoration: none; font-weight: bold; border: 1px solid #dc3545; padding: 8px 15px; border-radius: 5px; }
     </style>
 </head>
@@ -70,36 +76,38 @@ if ($role) {
         <div class="card" style="text-align: center; padding: 30px 20px; border-bottom: 5px solid #007bff;">
             <h2 style="margin-top: 0; color: #333;">Library Resources Catalog</h2>
             <p style="color: #666;">Access Research Papers, Magazines, and Journals.</p>
-            <a href="materials_catalog.php" class="catalog-link" style="background: #007bff; color: white; padding: 12px 35px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 10px;">
+            <a href="view_books.php" class="catalog-link" style="background: #007bff; color: white; padding: 12px 35px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 10px;">
                 Open Full Catalog →
             </a>
         </div>
 
         <div class="card">
-            <h3>Quick View: Latest Books</h3>
+            <h3>My Borrowed Books</h3>
             <table>
                 <thead>
                     <tr>
                         <th>Book Title</th>
-                        <th>Availability</th>
+                        <th>Borrow Date</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($booksQuery && $booksQuery->num_rows > 0): ?>
-                        <?php while($b = $booksQuery->fetch_assoc()): ?>
+                    <?php if ($borrowQuery && $borrowQuery->num_rows > 0): ?>
+                        <?php while($b = $borrowQuery->fetch_assoc()): ?>
                         <tr>
                             <td><strong><?= htmlspecialchars($b['BookTitle']) ?></strong></td>
+                            <td><?= date('M d, Y', strtotime($b['BorrowDate'])) ?></td>
+                            <td><?= date('M d, Y', strtotime($b['DueDate'])) ?></td>
                             <td>
-                                <?php if($b['Quantity'] > 0): ?>
-                                    <span style="color:green; font-weight:bold;">● In Stock (<?= $b['Quantity'] ?>)</span>
-                                <?php else: ?>
-                                    <span style="color:red; font-weight:bold;">● Out of Stock</span>
-                                <?php endif; ?>
+                                <span class="badge <?= ($b['Status'] == 'Returned') ? 'badge-returned' : 'badge-pending' ?>">
+                                    <?= $b['Status'] ?>
+                                </span>
                             </td>
                         </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
-                        <tr><td colspan="2" style="text-align:center; color:#888;">No books found in the database.</td></tr>
+                        <tr><td colspan="4" style="text-align:center; color:#888;">You haven't borrowed any books yet.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -125,6 +133,8 @@ if ($role) {
                         </div>
                     </div>
                 <?php endwhile; ?>
+            <?php else: ?>
+                <p style="text-align:center; color:#888;">No notifications.</p>
             <?php endif; ?>
         </div>
     </div>
@@ -140,28 +150,3 @@ if ($role) {
 
         <div class="card">
             <h3>Profile Summary</h3>
-            <p><strong>Name:</strong> <?= htmlspecialchars($uName) ?></p>
-            <p><strong>Role:</strong> <span class="role-badge"><?= $displayRole ?></span></p>
-        </div>
-    </div>
-</div>
-
-<script>
-document.querySelectorAll('.mark-read-cb').forEach(checkbox => {
-    checkbox.addEventListener('change', function() {
-        if(this.checked) {
-            const notifId = this.getAttribute('data-id');
-            fetch('mark_read.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + notifId
-            }).then(() => {
-                document.getElementById('status-box-' + notifId).innerHTML = '<span class="status-read-text">✔ Read</span>';
-            });
-        }
-    });
-});
-</script>
-
-</body>
-</html>
