@@ -16,11 +16,31 @@ if (!$roleData || $roleData['AdminID'] == 0) {
     exit();
 }
 
+// --- BAGONG LOGIC: HANDLE PERMANENT DELETE ---
+if (isset($_GET['delete_id'])) {
+    $id = $_GET['delete_id'];
+    // Burahin muna ang references sa book_authors bago ang main book record (Foreign Key constraint)
+    $conn->query("DELETE FROM book_authors WHERE BookID = '$id'");
+    if ($conn->query("DELETE FROM books WHERE BookID = '$id'")) {
+        echo "<script>alert('Book permanently deleted!'); window.location='book.php';</script>";
+    }
+}
+
+// --- BAGONG LOGIC: HANDLE EDIT/UPDATE ---
+if (isset($_POST['update_book'])) {
+    $id = $_POST['book_id'];
+    $title = mysqli_real_escape_string($conn, $_POST['title']);
+    $qty = (int)$_POST['quantity'];
+
+    $updateQuery = "UPDATE books SET BookTitle = '$title', Quantity = '$qty' WHERE BookID = '$id'";
+    if ($conn->query($updateQuery)) {
+        echo "<script>alert('Book updated successfully!'); window.location='book.php';</script>";
+    }
+}
+
 // 2. HANDLE ARCHIVING (SOFT DELETE)
 if (isset($_GET['archive_id'])) {
     $id = $_GET['archive_id'];
-    
-    // Get the book data before deleting it from the main table
     $getBook = $conn->query("SELECT * FROM books WHERE BookID = '$id'")->fetch_assoc();
     
     if ($getBook) {
@@ -29,12 +49,10 @@ if (isset($_GET['archive_id'])) {
         $pub = $getBook['PublisherId'];
         $qty = $getBook['Quantity'];
 
-        // Move to Archive table
         $archiveQuery = "INSERT INTO book_archive (BookID, BookTitle, CategoryID, PublisherId, Quantity) 
                          VALUES ('$id', '$title', '$cat', '$pub', '$qty')";
         
         if ($conn->query($archiveQuery)) {
-            // Delete from main books table
             $conn->query("DELETE FROM books WHERE BookID = '$id'");
             echo "<script>alert('Book moved to Archive!'); window.location='book.php';</script>";
         }
@@ -54,37 +72,16 @@ if (isset($_POST['add_book'])) {
         exit();
     }
 
-    // Category Logic
     $catCheck = $conn->query("SELECT CategoryID FROM categories WHERE CategoryName = '$catName'");
-    if ($catCheck->num_rows > 0) {
-        $catID = $catCheck->fetch_assoc()['CategoryID'];
-    } else {
-        $conn->query("INSERT INTO categories (CategoryName) VALUES ('$catName')");
-        $catID = $conn->insert_id;
-    }
+    $catID = ($catCheck->num_rows > 0) ? $catCheck->fetch_assoc()['CategoryID'] : ($conn->query("INSERT INTO categories (CategoryName) VALUES ('$catName')") ? $conn->insert_id : 0);
 
-    // Publisher Logic
     $pubCheck = $conn->query("SELECT PublisherID FROM publisher WHERE PublisherName = '$pubName'");
-    if ($pubCheck->num_rows > 0) {
-        $pubID = $pubCheck->fetch_assoc()['PublisherID'];
-    } else {
-        $conn->query("INSERT INTO publisher (PublisherName) VALUES ('$pubName')");
-        $pubID = $conn->insert_id;
-    }
+    $pubID = ($pubCheck->num_rows > 0) ? $pubCheck->fetch_assoc()['PublisherID'] : ($conn->query("INSERT INTO publisher (PublisherName) VALUES ('$pubName')") ? $conn->insert_id : 0);
 
-    // Author Logic
     $authCheck = $conn->query("SELECT AuthorID FROM authors WHERE AuthorName = '$authorName'");
-    if ($authCheck->num_rows > 0) {
-        $authID = $authCheck->fetch_assoc()['AuthorID'];
-    } else {
-        $conn->query("INSERT INTO authors (AuthorName) VALUES ('$authorName')");
-        $authID = $conn->insert_id;
-    }
+    $authID = ($authCheck->num_rows > 0) ? $authID = $authCheck->fetch_assoc()['AuthorID'] : ($conn->query("INSERT INTO authors (AuthorName) VALUES ('$authorName')") ? $conn->insert_id : 0);
 
-    // Final Insert
-    $insertBook = "INSERT INTO books (BookTitle, CategoryID, PublisherId, Quantity) 
-                   VALUES ('$title', '$catID', '$pubID', '$qty')";
-    
+    $insertBook = "INSERT INTO books (BookTitle, CategoryID, PublisherId, Quantity) VALUES ('$title', '$catID', '$pubID', '$qty')";
     if ($conn->query($insertBook)) {
         $newBookID = $conn->insert_id;
         $conn->query("INSERT INTO book_authors (BookID, AuthorID) VALUES ('$newBookID', '$authID')");
@@ -92,7 +89,7 @@ if (isset($_POST['add_book'])) {
     }
 }
 
-// 4. Fetch Active Books for Table
+// 4. Fetch Active Books
 $sql = "SELECT b.BookID, b.BookTitle, c.CategoryName, p.PublisherName, b.Quantity 
         FROM books b
         JOIN categories c ON b.CategoryID = c.CategoryID
@@ -115,8 +112,10 @@ $result = $conn->query($sql);
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #333; color: white; }
         .btn { background: #28a745; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; }
-        .btn-archive { background: #ffc107; color: #000; padding: 5px 10px; text-decoration: none; border-radius: 4px; font-size: 0.9em; }
-        .btn-view-archive { background: #6c757d; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; }
+        .btn-edit { background: #007bff; color: white; padding: 5px 10px; text-decoration: none; border-radius: 4px; font-size: 0.85em; }
+        .btn-archive { background: #ffc107; color: #000; padding: 5px 10px; text-decoration: none; border-radius: 4px; font-size: 0.85em; }
+        .btn-delete { background: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 4px; font-size: 0.85em; }
+        .edit-row { background: #f9f9f9; display: none; } /* Hidden edit form */
     </style>
 </head>
 <body>
@@ -124,7 +123,7 @@ $result = $conn->query($sql);
 <div class="container">
     <div class="header-nav">
         <a href="admindashboard.php" style="text-decoration: none; color: blue;">← Back to Dashboard</a>
-        <a href="archive.php" class="btn-view-archive">📂 View Archive (Recently Deleted)</a>
+        <a href="archive.php" class="btn-view-archive" style="background: #6c757d; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;">📂 View Archive</a>
     </div>
 
     <h1>Manage Library Books</h1>
@@ -173,16 +172,41 @@ $result = $conn->query($sql);
                     <td><?= htmlspecialchars($row['PublisherName']) ?></td>
                     <td><?= $row['Quantity'] ?></td>
                     <td>
-                        <a href="book.php?archive_id=<?= $row['BookID'] ?>" class="btn-archive" onclick="return confirm('Are you sure you want to archive this book?')">Archive</a>
+                        <button class="btn-edit" onclick="toggleEdit(<?= $row['BookID'] ?>)">Edit</button>
+                        <a href="book.php?archive_id=<?= $row['BookID'] ?>" class="btn-archive" onclick="return confirm('Move to Archive?')">Archive</a>
+                        <a href="book.php?delete_id=<?= $row['BookID'] ?>" class="btn-delete" onclick="return confirm('PERMANENTLY DELETE this book?')">Delete</a>
                     </td>
+                </tr>
+                <tr id="edit-form-<?= $row['BookID'] ?>" class="edit-row">
+                    <form method="POST">
+                        <input type="hidden" name="book_id" value="<?= $row['BookID'] ?>">
+                        <td colspan="1">Editing...</td>
+                        <td colspan="4"><input type="text" name="title" value="<?= htmlspecialchars($row['BookTitle']) ?>" required style="width:90%"></td>
+                        <td colspan="1"><input type="number" name="quantity" value="<?= $row['Quantity'] ?>" required style="width:50px"></td>
+                        <td>
+                            <button type="submit" name="update_book" class="btn" style="padding: 5px 10px;">Save</button>
+                            <button type="button" onclick="toggleEdit(<?= $row['BookID'] ?>)" style="padding: 5px 10px;">Cancel</button>
+                        </td>
+                    </form>
                 </tr>
                 <?php endwhile; ?>
             <?php else: ?>
-                <tr><td colspan="7" style="text-align: center;">No books in active inventory.</td></tr>
+                <tr><td colspan="7" style="text-align: center;">No books found.</td></tr>
             <?php endif; ?>
         </tbody>
     </table>
 </div>
+
+<script>
+function toggleEdit(id) {
+    var row = document.getElementById('edit-form-' + id);
+    if (row.style.display === 'table-row') {
+        row.style.display = 'none';
+    } else {
+        row.style.display = 'table-row';
+    }
+}
+</script>
 
 </body>
 </html>
