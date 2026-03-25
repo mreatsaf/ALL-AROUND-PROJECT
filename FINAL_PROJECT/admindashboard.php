@@ -41,7 +41,7 @@ $unreadNotifs = $conn->query("SELECT COUNT(*) as total FROM notifications WHERE 
         .stat-card { background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .stat-card h2 { margin: 5px 0; color: #007bff; }
         
-        .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .menu-grid {  display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
         .menu-card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: 0.3s; text-decoration: none; color: #333; border-left: 5px solid #007bff; }
         .menu-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
         .menu-card h3 { margin-top: 0; color: #333; }
@@ -85,6 +85,11 @@ $unreadNotifs = $conn->query("SELECT COUNT(*) as total FROM notifications WHERE 
     <a href="book.php" class="menu-card">
         <h3>📚 Book Management</h3>
         <p>Add new titles, update quantities, and manage authors or publishers.</p>
+    </a>
+
+    <a href="materials_catalog.php" class="menu-card" style="border-left-color: #6610f2;">
+    <h3>🧰 Materials Management</h3>
+    <p>Manage library materials like equipment, references, and other resources.</p>
     </a>
 
     <a href="admin_notifications.php" class="menu-card" style="border-left-color: #ffc107;">
